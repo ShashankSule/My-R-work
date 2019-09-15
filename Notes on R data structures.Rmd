@@ -1,0 +1,211 @@
+---
+title: "Some data types in R"
+author: "Shashank Sule"
+date: "9/7/2019"
+output: pdf_document
+fontsize: 12pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## R syntax from Data Camp
+
+
+### General
+
+How to ask for help about a function 
+
+```{r}
+?mean
+```
+
+### Vectors
+
+Vectors can be generated in two ways: 
+```{r}
+Vec1 <- c(1,2,3)
+Vec2 <- 1:3
+Vec3 <- c("Monday", "Wednesday", "Tuesday")
+Vec1 
+Vec2
+Vec3
+```
+  Here $c$ is the concatentation operator. Note that $<-$ is the assignment operator.  
+
+We can use the following function to assign names to indices in a vector: 
+```{r}
+names(Vec1) <- Vec3
+Vec1["Tuesday"]
+```
+We can also create a sub-vector using vectors of logical values:
+```{r}
+Vals = c(TRUE, FALSE, TRUE)
+Vec1[Vals]
+```
+
+Lastly, a `list` is a "generic" data type because it can store any sorts of objects you want in an ordered tuple: 
+
+```{r}
+A = list(c("Monday", "Tuesday", "Wednesday"), c(1,2))
+A[1]
+A[2]
+```
+
+The `order` function orders values in a vector. It returns indices ordered by the ascending order of the elements they represent. Note that for numerical vectors it orders them by comparison but for string vectors it does that by lexicographic order. You can order a vector `v` by doing `v[order(v)]` 
+```{r}
+G = c("H", "Hell", "Hello","He", "Hel")
+order(G)
+G[order(G)]
+```
+
+
+
+### Matrices 
+
+The `matrix` function takes three values and organizes a vector into a matrix specified by row or column:
+
+```{r}
+NumMat = matrix(1:9, byrow=TRUE, nrow = 3)
+NumMat
+```
+
+The `rownames` and `colnames` functions allow you to name rows and columns: 
+
+```{r}
+# Box office Star Wars (in millions!)
+new_hope <- c(460.998, 314.4)
+empire_strikes <- c(290.475, 247.900)
+return_jedi <- c(309.306, 165.8)
+
+# Construct matrix
+star_wars_matrix <- matrix(c(new_hope, empire_strikes, return_jedi), nrow = 3, byrow = TRUE)
+
+# Vectors region and titles, used for naming
+region <- c("US", "non-US")
+titles <- c("A New Hope", "The Empire Strikes Back", "Return of the Jedi")
+
+# Name the columns with region
+colnames(star_wars_matrix) <- region
+rownames(star_wars_matrix) <- titles
+
+star_wars_matrix
+
+```
+
+We can do direct assignment within the `matrix` function as well, via the `dimnames` parameter. Furthermore, we can calculae the rowsum using `rowSums()`: 
+
+```{r}
+# Construct star_wars_matrix
+box_office <- c(460.998, 314.4, 290.475, 247.900, 309.306, 165.8)
+star_wars_matrix <- matrix(box_office, nrow = 3, byrow = TRUE,
+                           dimnames = list(c("A New Hope", "The Empire Strikes Back", "Return of the Jedi"), 
+                                           c("US", "non-US")))
+
+# The worldwide box office figures
+worldwide_vector <- rowSums(star_wars_matrix)
+
+print(worldwide_vector)
+```
+
+Similarly, there is a `colsums()` function too. Furthermore, horizontal concatentation is done using `cbind()` and vertical concatentation is done using `rbind()`. 
+
+Finally, matrix selection works pretty logically. To say select the bottom right hand corner 2 by 2 matrix of the `star_wars_matrix` we do the following 
+
+```{r}
+bottom_right_hand_2by2 <- star_wars_matrix[2:3,1:2]
+bottom_right_hand_2by2
+```
+
+Note that we selected all the columns of the matrix so we could have also done the following: 
+
+```{r}
+star_wars_matrix[2:3,]
+```
+The syntax works similarly if you want to select particular columns and all rows. Lastly, to recover the dimensions of a matrix, we can use the `dim` function which returns an integer vector.
+
+```{r}
+dim(star_wars_matrix)
+class(dim(star_wars_matrix))
+length(dim(star_wars_matrix))
+```
+
+### Factors
+
+Factors are pretty high level data structures in R. Basically, a data set may comprise categorical variables such as "Male" and "Female". The factors tool bascially helps R understand that a given variable is actually a dataset of categorical variables. This is a very data-specific tool. Here's a simple example. The `cars` vector stores the speeds of 5 cars (indexed as `1:5`) as `"slow"`, `"medium"`, or `"fast"`. Now, I want R to know that. So I use the `factor` function with ordering. 
+
+```{r}
+cars = c("slow", "medium", "medium", "slow", "fast")
+cars_ordered = factor(cars, ordered=TRUE, levels=c("fast", "medium","slow"))
+summary(cars_ordered)
+summary(cars)
+```
+
+As you can see, R views `cars_ordered` differently than `cars` because according to R, `cars` is just another vector of strings whereas `cars_ordered` is actually a dataset that stores data on which car is slow medium or fast. (This is also what you do when you mark a multiple choice exam. You first grade, and then count how many questions were right, wrong, and not attempted). 
+
+In another perspective, `factor` picks up distinct values from a multiset. So to recover the distinct values, we use the levels function: 
+
+```{r}
+C = 
+  levels(cars_ordered)
+C 
+C[1] > C[2]
+```
+
+Only note that when the factor is ordered, the variables in the levels vector carry extra information, namely information on their ordering. That is why `C[1] > C[2]` returned `TRUE` because `"fast"` is bigger than `"slow"`. 
+
+### data.frames
+
+Data frames are R's flagship for storing datasets. You can create a dataset using row/column vectors and literally entering them as arguments in the `data.frame()` function: 
+
+```{r}
+# Definition of vectors
+name <- c("Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune")
+type <- c("Terrestrial planet", "Terrestrial planet", "Terrestrial planet", 
+          "Terrestrial planet", "Gas giant", "Gas giant", "Gas giant", "Gas giant")
+diameter <- c(0.382, 0.949, 1, 0.532, 11.209, 9.449, 4.007, 3.883)
+rotation <- c(58.64, -243.02, 1, 1.03, 0.41, 0.43, -0.72, 0.67)
+rings <- c(FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, TRUE, TRUE)
+
+# Create a data frame from the vectors
+planets_df <- data.frame(name,type, diameter, rotation, rings)
+planets_df
+```
+
+Data frames are better than just matrices because R has additional knowledge about their entries. For example, it understands that the top rows are actually labels for the table.
+However, you can refer to elements in the data frame just like matrices using index notation: 
+
+```{r}
+# Print out diameter of Mercury (row 1, column 3)
+
+planets_df[1,3]
+# Print out data for Mars (entire fourth row)
+planets_df[4,]
+```
+You can also extract a category from the frame using the `$` operator. This is an additional feature of data frames: 
+
+```{r}
+planets_df$diameter
+```
+Additionally, you can always extract this into a vector and operate on it like you operate on vectors. 

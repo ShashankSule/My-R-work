@@ -1,0 +1,332 @@
+---
+title: "Notes on Tidyverse"
+author: "Shashank Sule"
+date: "9/15/2019"
+output: pdf_document
+header-includes:
+  -\usepackage[margin=1in]{geometry}
+fontsize: 12pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Tidyverse is the collection of tools which help you visualize and explore data. The example we will use is the gapminder data set. 
+
+```{r}
+require(gapminder)
+require(dplyr)
+
+gapminder
+```
+
+Note that `gapminder` is a `tibble`, a bit different from `data.frame`. 
+
+# Verbs from `dplyr`
+
+Verbs are the functions within `dplyr`. Every time you use a verb, you use a pipe which composes verbs. 
+
+1. `filter`
+
+`filter` literally filters your data frame according to the criteria you give. Suppose you want to filter the dataset for 2007. 
+
+```{r}
+gapminder %>% 
+  filter(year == 2007) #Indexing the array by boolean variables
+
+#You can also double filter
+
+gapminder %>% filter(year == 2007, country == "United States")
+
+```
+
+2. `arrange`
+
+`arrange` sorts the dataset according to the column you want to arrange by. By default it arranges according to ascending order. To sort in descending order you do `arrange(desc(#colname))`
+
+```{r}
+# Sort in ascending order of lifeExp
+gapminder %>% arrange(lifeExp)
+  
+# Sort in descending order of lifeExp
+gapminder %>% arrange(desc(lifeExp))
+```
+
+
+3. `mutate`
+
+`mutate` either changes an existing column in the data frame or adds a new one. Note that it is not a "static" function: it does not make any changes to the data frame you pass as an argument. Instead, it returns a new data frame that is a result of passing the original data frame through `mutate`. 
+
+```{r}
+# Use mutate to change lifeExp to be in months
+gapminder %>% mutate(lifeExp = lifeExp * 12)
+
+# Use mutate to create a new column called lifeExpMonths
+
+gapminder %>% mutate(lifeExpMonths = lifeExp * 12)
+```
+
+```{r}
+# Filter, mutate, and arrange the gapminder dataset
+
+gapminder %>%
+  filter(year == 2007) %>%
+  mutate(lifeExpMonths = 12 * lifeExp)%>%
+  arrange(desc(lifeExpMonths))
+```
+
+4. `summarize`
+
+`summarize` returns a `tibble` with "summarizing" statistics of the dataset you give. 
+
+```{r}
+# Summarize to find the median life expectancy
+
+gapminder %>% summarize(medianLifeExp = median(lifeExp))
+
+
+# Filter for 1957 then summarize the median life expectancy
+gapminder %>% filter(year == 2007) %>%
+ summarize(medianLifeExp = median(lifeExp))
+
+# Summarize can even return two values
+
+gapminder %>% filter(year == 1957) %>%
+  summarize(medianLifeExp = median(lifeExp), maxGdpPercap = max(gdpPercap))
+
+```
+
+5. `group_by`
+
+In the previous example, filter allowed you to select a value of one particular column, which then you summarized. In order to summarize over all values of a particular column, we use `group_by`. It's equivalent to using a for loop on `filter` where the loop runs over the all the possible arguments passable to filter (which is what you would do to get an overall summary table if you didn't know about `group_by`).
+
+```{r}
+# Find median life expectancy and maximum GDP per capita in each year
+gapminder %>%
+  group_by(year) %>%
+  summarize(medianLifeExp = median(lifeExp), maxGdpPercap = max(gdpPercap))
+
+
+# Find median life expectancy and maximum GDP per capita in each continent in 1957
+
+gapminder %>%
+ filter(year==1957) %>%
+ group_by(continent) %>%
+ summarize(medianLifeExp = median(lifeExp), maxGdpPercap = max(gdpPercap))
+
+#You can even pass two arguments to group_by. In that case it returns the summary table over all possible combinations of the values of the passed arguments 
+
+gapminder %>%
+ group_by(continent, year) %>%
+ summarize(medianLifeExp = median(lifeExp), maxGdpPercap = max(gdpPercap))
+
+# In the above output, summarize gave the summaries at all possible (year, continent) combinations. 
+```
+
+
+# Visualization with ggplot2
+
+`ggplot2` is the canonical data visualization tool. We'll load it here
+
+```{r}
+library("ggplot2")
+```
+
+The basic syntax for making a plot is `ggplot(#dataframe, ae(x=#xcomponent, y=#component))`. The `+` operator will signify additional features to the plot. 
+
+1. Scatter plot
+
+Scatter plots are achieved using `+ geom_point()`. 
+```{r, fig.height=3, fig.width=4, fig.align='center'}
+library(dplyr)
+library(gapminder)
+gapminder_1952 <- gapminder %>%
+  filter(year == 1952)
+ggplot(gapminder_1952, aes(x = pop, y = gdpPercap)) +
+  geom_point()
+ggplot(gapminder_1952, aes(x=pop, y=lifeExp)) + geom_point() 
+
+```
+
+2. Log scale
+
+You can use log axes by adding `+ scale_x_log10()` or `+ scale_y_log10()`. 
+
+```{r, fig.height=3, fig.width=4, fig.align='center'}
+ggplot(gapminder_1952, aes(x = pop, y = lifeExp)) +
+  geom_point() + 
+  scale_x_log10()
+ggplot(gapminder_1952, aes(x=pop, y=gdpPercap)) + 
+  geom_point() + 
+  scale_x_log10() +
+  scale_y_log10()
+
+```
+
+3. Aesthetics
+
+You can add more than just `x` and `y` in the `aes()` parameter in `ggplot`. For example, you can add `color` which is the colour of the data points, and `size` which is their size. For colour, ggplot automatically adds a legend! 
+
+```{r, fig.height=3, fig.width=4, fig.align='center'}
+ggplot(gapminder_1952, aes(x=pop, y=lifeExp,color=continent)) + 
+  geom_point() + 
+  scale_x_log10()
+
+ggplot(gapminder_1952, aes(x = pop, y = lifeExp, color = continent, size = gdpPercap)) +
+  geom_point() +
+  scale_x_log10()
+```
+
+
+Question: do `color` and `size` only matter when you use the scatter plot? Question: is it possible to modify the legend (say represent the `gdpPercap` values in log scale?)
+
+4. Faceting
+
+Faceting refers to the practice of making multiple plots within the same figure. In `ggplot` you can make multiple plots according to their indices in the dataset. To facet a plot, we use `+ facet_wrap(~#indexingparameter)`. 
+
+```{r, fig.height=3, fig.width=4, fig.align='center'}
+# Here we break down the analysis of population vs life expectancy according to continent. Conveniently, continent is a column in our data frame. 
+
+# Scatter plot comparing pop and lifeExp, faceted by continent
+ggplot(gapminder_1952, aes(x=pop, y=lifeExp, size = pop, color = continent)) + 
+geom_point() + 
+scale_x_log10() + 
+facet_wrap(~ continent)
+```
+
+
+Note that we can apply the `color` and the `facet_wrap` functions to the same parameters. The result is obviously that all the colours go into the same subplot. 
+
+```{r, fig.height=3, fig.width=4, fig.align='center'}
+# Scatter plot comparing gdpPercap and lifeExp, with color representing continent
+# and size representing population, faceted by year
+ggplot(gapminder, aes(x=gdpPercap, y=lifeExp, color = continent, size = pop)) + 
+geom_point() + 
+scale_x_log10() + 
+facet_wrap(~ year)
+```
+
+5. Axes limits 
+
+Set axes limits using `+ expand_limits(y=#value)`
+
+```{r, fig.height=3, fig.width=4, fig.align='center'}
+
+# Here we'll visualize some summarized data
+by_year <- gapminder %>%
+  group_by(year) %>%
+  summarize(medianLifeExp = median(lifeExp),
+            maxGdpPercap = max(gdpPercap))
+
+# Create a scatter plot showing the change in medianLifeExp over time
+
+ggplot(by_year, aes(x = year, y = medianLifeExp)) + 
+  geom_point() + 
+  expand_limits(y=0)
+
+# Summarize medianGdpPercap within each continent within each year: by_year_continent
+by_year_continent <- gapminder %>%
+ group_by(year, continent) %>%
+ summarize(medianGdpPercap = median(gdpPercap))
+
+# Plot the change in medianGdpPercap in each continent over time
+
+ggplot(by_year_continent, aes(x=year, y=medianGdpPercap, color = continent)) + 
+geom_point() + 
+expand_limits(y=0)
+```
+
+6. Line plot
+
+To make a Line plot, use `+ geom_line()`
+
+```{r, fig.height=3, fig.width=4, fig.align='center'}
+# Summarize the median gdpPercap by year, then save it as by_year
+by_year <- gapminder %>%
+  group_by(year) %>%
+  summarize(medianGdpPercap = median(gdpPercap))
+
+# Create a line plot showing the change in medianGdpPercap over time
+
+ggplot(by_year, aes(x=year, y=medianGdpPercap)) + 
+geom_line() + 
+expand_limits(y=0)
+
+# Summarize the median gdpPercap by year & continent, save as by_year_continent
+by_year_continent <- gapminder %>%
+  group_by(year, continent) %>%
+  summarize(medianGdpPercap = median(gdpPercap))
+
+# Create a line plot showing the change in medianGdpPercap by continent over time
+
+ggplot(by_year_continent, aes(x=year, y=medianGdpPercap, color = continent)) + 
+geom_line() + 
+expand_limits(y=0)
+```
+
+7. Bar plot
+
+Use `+ geom_col()`
+
+```{r, fig.height=3, fig.width=4, fig.align='center'}
+# Summarize the median gdpPercap by year and continent in 1952
+by_continent <- gapminder %>%
+  filter(year==1952) %>%
+  group_by(continent) %>%
+  summarize(medianGdpPercap = median(gdpPercap))
+
+# Create a bar plot showing medianGdp by continent
+
+ggplot(by_continent,aes(x=continent, y=medianGdpPercap)) + 
+geom_col()
+```
+
+
+8. Histogram 
+
+Use `+ geom_histogram(binwidth=#setwidth)`. Note that for hist, you need only specify `x` in `aes()`. 
+
+```{r, fig.height=3, fig.width=4, fig.align='center'}
+gapminder_1952 <- gapminder %>%
+  filter(year == 1952)
+
+# Create a histogram of population (pop), with x on a log scale
+
+ggplot(gapminder_1952, aes(x=pop)) + 
+scale_x_log10()+
+geom_histogram()
+```
+
+
+9. Box-Whisker plot
+
+Use `+ geom_boxplot()` 
+
+```{r, fig.height=3, fig.width=4, fig.align='center'}
+gapminder_1952 <- gapminder %>%
+  filter(year == 1952)
+
+# Create a boxplot comparing gdpPercap among continents
+
+ggplot(gapminder_1952, aes(x=continent, y=gdpPercap)) + 
+geom_boxplot() + 
+scale_y_log10()
+```
+
+10. Adding title and x and y labels 
+
+For title use `+ ggtitle()` and for labels use `labs(x=#namehere, y=#namehere)`
+
+```{r, fig.height=3, fig.width=4, fig.align='center'}
+gapminder_1952 <- gapminder %>%
+  filter(year == 1952)
+
+# Add a title to this graph: "Comparing GDP per capita across continents"
+ggplot(gapminder_1952, aes(x = continent, y = gdpPercap)) +
+  geom_boxplot() +
+  scale_y_log10() + 
+  ggtitle("Comparing GDP per capita across continents") + 
+  labs(x="Continent", y="GDP per Capita")
+```
+
