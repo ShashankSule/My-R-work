@@ -67,7 +67,7 @@ When $\sigma$ (or $\phi$) is  known, mean $\mu$ is the only parameter in the lik
 
 ## \textcolor{RoyalBlue}{The CE data example}
 Obtain the CE data sample from Moodle (a .csv file). Below is the sample R script to take log transformation of the \texttt{TotalExpLastQ} variable. 
-```{r, eval=FALSE}
+```{r, echo=FALSE}
 require(readr)
 CEsample <- read_csv("CEsample1.csv")
 CEsample$LogTotalExpLastQ <- log(CEsample$TotalExpLastQ)
@@ -75,7 +75,7 @@ CEsample$LogTotalExpLastQ <- log(CEsample$TotalExpLastQ)
 
 Below is the sample R script to obtain the mean \texttt{mu\_n} and the standard deviation \texttt{sd\_n} for the posterior distribution for $\mu$. Note the prior choice $\pi(\mu) \sim \textrm{Normal}(5, 1)$. Also note the use of the known precision for \texttt{phi <- 1.25}.
 
-```{r, eval=FALSE}
+```{r, echo=FALSE}
 mu_0 <- 5
 sigma_0 <- 1
 phi_0 <- 1/sigma_0^2
@@ -97,7 +97,7 @@ Hint: For the exact solution, use the \texttt{pnorm()} function; for approximati
 Using the exact solution we have that the probability that the log total expenditure is $9$ or more is 
 
 ```{r}
-1 - pnorm(9, mu_n, sd_n)
+1 - pnorm(9, mean = mu_n, sd = sd_n)
 ```
 
 Furthermore, by sampling randomly with 1000 samples we get the probability 
@@ -155,7 +155,7 @@ One simulates a value from the predictive distribution in two steps: first, one 
 
 Hint: use the \texttt{rnorm()} function; use the known \texttt{phi <- 1.25} and/or \texttt{sigma <- 0.9}.
 
-```{r, eval=FALSE}
+```{r, echo=FALSE}
 # Here is some sample script to create the plot of the predicted log expenditure
 # Suppose y_pred is the vector storing the predicted values, and the column name is y
 require(ggplot2)
@@ -198,7 +198,7 @@ While Bayesian prediction is focused on simulating one $\tilde{Y}$ from one post
 
 Hint: use the \texttt{rnorm()} function; use the known \texttt{phi <- 1.25} and/or \texttt{sigma <- 0.9}.
 
-```{r, eval=FALSE}
+```{r, echo=FALSE}
 # Here is some sample script to create the plot of the predicted sample mean of log expenditure
 # Suppose mean_ppc is the vector storing the predicted sample mean values, 
 # and the column name is mean 
