@@ -1,0 +1,137 @@
+---
+title: "Solutions to Homework 3"
+author: "Shashank Sule"
+date: "9/10/2019"
+header-includes:
+   - \usepackage{amsmath}
+   - \usepackage{amsthm}
+   - \usepackage{amssymb}
+   - \usepackage{amsfonts}
+   - \usepackage[margin=1in]{geometry}
+output: pdf_document
+fontsize: 12pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(LearnBayes)
+require(ggplot2)
+require(reshape2)
+```
+
+# Problem 1 
+
+a) In a Beta distribution parametrized as $\text{Beta}(a,b)$, $a$ represents the number of successes and $b$ the number of failures. So if there were $8$ successes and $2$ failures out of a data of $10$ then Alex has a prior $\text{Beta}(a,b)$.
+
+b) We compute the parameters using the \texttt{beta.select} function: 
+
+```{r, echo=FALSE}
+quantile1=list(p=.2,x=0.3)
+quantile2=list(p=.9,x=0.4)
+parameters <- beta.select(quantile1,quantile2)
+alpha <- parameters[1]
+beta <- parameters[2]
+parameters
+```
+
+c) Note that $y=692$, $n=1048$ and the posterior distribution is $\text{Beta}(a + y, b + n - y)$. So Alex has posterior $\text{Beta}(700, 358)$ and Benedict has posterior $\text{Beta}(726.95, 423.98)$. 
+
+The prior: 
+```{r, echo=FALSE}
+p <- seq(from=0, to=1, by=0.01)
+Alex <- sapply(p, dbeta, shape1 = 8, shape2 = 2)
+Benedict <- sapply(p, dbeta, shape1 = alpha, shape2 = beta)
+prior <- data.frame(p, Alex, Benedict)
+priort <- melt(prior, id="p")
+ggplot(data=priort, aes(x=p, y=value, color=variable))+
+  geom_line()+
+  labs(title="Comparing priors", x="p", y="Density", color="Prior")
+```
+
+
+```{r, echo=FALSE}
+p <- seq(from=0, to=1, by=0.001)
+AlexPos <- sapply(p, dbeta, shape1 = 8+692, shape2 = 2+1048-692)
+BenedictPos <- sapply(p, dbeta, shape1 = alpha+692, shape2 = beta + 1048-692)
+posterior <- data.frame(p, AlexPos, BenedictPos)
+posteriort <- melt(posterior, id="p")
+ggplot(data=posteriort, aes(x=p, y=value, color=variable))+
+  geom_line()+
+  labs(title="Comparing Posteriors", x="p", y="Density")+
+  scale_color_discrete(name="Posterior", labels=c("Alex", "Benedict"))
+```
+
+Credible intervals for Alex: 
+
+```{r, echo=FALSE}
+qbeta(c(0.025,0.975), shape1 = 8+692, shape2 = 2 + 1048 - 692)
+```
+
+Credible intervals for Benedict:
+
+```{r, echo=FALSE}
+qbeta(c(0.025,0.975), shape1 = alpha+692, shape2 = beta + 1048 - 692)
+```
+
+d) To conduct a prior predictive check, we sample values from each prior and then sample a value from the likelihood function. Then we look for clustering of the sampled data around the actual data. I'll do a simulation for $1000$ trials.
+
+```{r, echo=FALSE}
+set.seed(123)
+S <- 1000 
+a <- rbeta(S, 8, 2)
+b <- rbeta(S, alpha, beta)
+alex <- sapply(a, rbinom, n=1, size = 1048)
+benedict <- sapply(b, rbinom, n=1, size=1048)
+```
+Alex's probability values: 
+
+```{r}
+c(sum(alex >= 692)/S, 1 - sum(alex >= 692)/S)
+```
+
+Benedict's probability values: 
+```{r}
+c(sum(benedict >= 692)/S, 1 - sum(benedict >= 692)/S)
+```
+
+Thus, neither have a good prior distribution for prediction but Benedict's is worse than Alex's because Benedict's probabiities are far more extreme (all of Benedict's data lies on one side of the actual observed value). 
+
+# Problem 2 
+
+To get the odds data, I'll use Monte Carlo sampling and then transform the data. The summarized data is as follows:
+
+```{r,echo=FALSE}
+apos <- rbeta(S, 8+692, 2+1048-692)
+bpos <- rbeta(S, alpha+692, beta+1048-692)
+odda <- apos/(1-apos)
+oddb <- bpos/(1-bpos)
+meana <- mean(odda)
+meanb <- mean(oddb)
+mediana <- median(odda)
+medianb <- median(oddb)
+qa <- quantile(odda, probs = c(0.025,0.975))
+qb <- quantile(oddb, probs = c(0.025,0.975))
+dats <- matrix(data = NA, nrow = 2, ncol = 4, byrow = TRUE, dimnames = list(c("Alex","Benedict"),c("Mean","Median", "2.5%", "97.5%")))
+dats[1,] <- c(meana, mediana, qa[1],qa[2])
+dats[2,] <- c(meanb, medianb, qb[1],qb[2])
+dats
+```
+
+On average, Alex's odds of kids having a TV in their room are slightly igher than those of Benedict. 
+
+# Problem 3 
+```{r, echo=FALSE}
+S <- c(10,100,500,1000,5000)
+left <- numeric(length = length(S))
+right <- numeric(length = length(S))
+for(i in 1:length(S)){
+  left[i] <- quantile(rbeta(S[i],15.06, 10.56), probs = c(0.05, 0.95))[1]
+  right[i] <- quantile(rbeta(S[i],15.06, 10.56), probs = c(0.05, 0.95))[2]
+}
+data <- data.frame(S,left,right)
+names(data) <- c("S","5%", "95%")
+data
+```
+
+I computed $S = \{10, 100, 500, 1000, 5000\}$ random samples from $\text{Beta}(15.06,10.56)$ using the \texttt{rbeta} function and then computed the quantiles of the data using \texttt{quantile}. As the number of samples gets larger, the interval gets closer to the actual credible interval. 
+

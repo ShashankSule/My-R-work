@@ -67,7 +67,7 @@ When $\sigma$ (or $\phi$) is  known, mean $\mu$ is the only parameter in the lik
 
 ## \textcolor{RoyalBlue}{The CE data example}
 Obtain the CE data sample from Moodle (a .csv file). Below is the sample R script to take log transformation of the \texttt{TotalExpLastQ} variable. 
-```{r, echo=FALSE}
+```{r, echo=TRUE}
 require(readr)
 CEsample <- read_csv("CEsample1.csv")
 CEsample$LogTotalExpLastQ <- log(CEsample$TotalExpLastQ)
@@ -75,7 +75,7 @@ CEsample$LogTotalExpLastQ <- log(CEsample$TotalExpLastQ)
 
 Below is the sample R script to obtain the mean \texttt{mu\_n} and the standard deviation \texttt{sd\_n} for the posterior distribution for $\mu$. Note the prior choice $\pi(\mu) \sim \textrm{Normal}(5, 1)$. Also note the use of the known precision for \texttt{phi <- 1.25}.
 
-```{r, echo=FALSE}
+```{r, echo=TRUE}
 mu_0 <- 5
 sigma_0 <- 1
 phi_0 <- 1/sigma_0^2
@@ -155,15 +155,16 @@ One simulates a value from the predictive distribution in two steps: first, one 
 
 Hint: use the \texttt{rnorm()} function; use the known \texttt{phi <- 1.25} and/or \texttt{sigma <- 0.9}.
 
-```{r, echo=FALSE}
+```{r, echo=TRUE}
 # Here is some sample script to create the plot of the predicted log expenditure
 # Suppose y_pred is the vector storing the predicted values, and the column name is y
 require(ggplot2)
-muvals <- rnorm(n,mu_n, sd_n)
+S <- 1000
+muvals <- rnorm(S,mu_n, sd_n)
 y <- sapply(muvals, rnorm, n=1, sd=0.9)
 y_pred <- data.frame(muvals,y)
 ggplot(data = y_pred, aes(y_pred$y)) +
-geom_histogram(breaks = seq(0, 20, by=0.5)) +
+geom_histogram(breaks = seq(6, 12, by=0.1)) +
 xlab("y") + theme(text = element_text(size=10))
 ```
 
@@ -198,7 +199,7 @@ While Bayesian prediction is focused on simulating one $\tilde{Y}$ from one post
 
 Hint: use the \texttt{rnorm()} function; use the known \texttt{phi <- 1.25} and/or \texttt{sigma <- 0.9}.
 
-```{r, echo=FALSE}
+```{r, echo=TRUE}
 # Here is some sample script to create the plot of the predicted sample mean of log expenditure
 # Suppose mean_ppc is the vector storing the predicted sample mean values, 
 # and the column name is mean 
@@ -212,7 +213,7 @@ for(i in 1:1000){
 }
 mean_ppc <- data.frame(means)
 ggplot(data = mean_ppc, aes(mean_ppc$means)) +
-geom_histogram(breaks = seq(0, 20, by=0.5)) +
+geom_histogram(breaks = seq(8.5, 9.0, by=0.01), fill = "blue") +
 annotate("point", x = sample_mean, y = 0, colour = "red", size = 5) + 
 xlab("y") + theme(text = element_text(size=10))
 ```
