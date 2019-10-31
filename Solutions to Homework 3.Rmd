@@ -135,3 +135,81 @@ data
 
 I computed $S = \{10, 100, 500, 1000, 5000\}$ random samples from $\text{Beta}(15.06,10.56)$ using the \texttt{rbeta} function and then computed the quantiles of the data using \texttt{quantile}. As the number of samples gets larger, the interval gets closer to the actual credible interval. 
 
+# Problem 4 
+
+a) Note that given the means $\mu_A$ and $\mu_B$, the data follows a normal likelihood. Now if we sample independently from both the accelerated and non-accelerated groups then the joint likelihood of the data is given by the product of their individual likelihood functions. First of all, from the formulas derived in class we set $\phi = 1/16$ and $n=6$ to get that
+
+$$ L_A(\mu_A) = \Big(\frac{1}{32\pi}\Big)^{3}e^{-\frac{1}{32}\sum_{i=1}^{6}(y_{A,i} - \mu_A)^2}$$
+and 
+
+
+$$ L_B(\mu_B) = \Big(\frac{1}{32\pi}\Big)^{3}e^{-\frac{1}{32}\sum_{j=1}^{6}(y_{B,j} - \mu_B)^2}$$
+
+The joint likelihood is obtained as a product of the individual likelihoods, so 
+
+$$ L_{A,B}(\mu_A, \mu_B) = L_A(\mu_A)L_B(\mu_B) = \Big(\frac{1}{32\pi}\Big)^{6}e^{-\frac{1}{32}\sum_{j=1}^{6}(y_{A,j} - \mu_A)^2 -\frac{1}{32}\sum_{j=1}^{6}(y_{B,j} - \mu_B)^2}$$  
+
+b) If the joint prior for $(\mu_A, \mu_B)$ is independent then the density function is a product of the individual priors, i.e $\pi(\mu_A, \mu_B) = \pi(\mu_A)\pi(\mu_B)$. Thus, the joint posterior can be obtained as follows: 
+
+$$ \pi(\mu_A, \mu_B \mid \textbf{Y}_A, \textbf{Y}_B, \sigma) = \frac{L_{A,B}(\mu_A,\mu_b)\pi_{A,B}(\mu_A,\mu_B)}{\int_{\mathbb{R^2}}L_{A,B}(x,y)\pi_{A,B}(x,y)\,dA}$$
+Since both the joint likelihood and prior are products of the marginal likelihood and prior, the integral in the denominator is separable. 
+
+$$ = \frac{L_A(\mu_A)\pi_A(\mu_A)L_B(\mu_b)\pi_B(\mu_B)}{\int_{\mathbb{R}}L_A(x)\pi_A(x)\,dx\int_{R}L_B(y)\pi_B(y)\,dy} = \Big(\frac{L_A(\mu_A)\pi_A(\mu_A)}{\int_{\mathbb{R}}L_A(x)\pi_A(x)\,dx}\Big)\Big(\frac{L_B(\mu_B)\pi_B(\mu_B)}{\int_{\mathbb{R}}L_B(y)\pi_B(y)\,dy}\Big) $$ 
+
+$$ = \pi_A(\mu_A \mid \textbf{Y}_A, \sigma)\pi_B(\mu_B \mid \textbf{Y}_B, \sigma)$$
+
+Finally, from the result in class, the family of normal distributions forms a conjugate prior under a normal likelihood where the posterior distribution has mean $\frac{\phi_0\mu_0 + n\phi\bar{y}}{\phi_0 + n\phi}$ and standard deviation $\sqrt{\frac{1}{\phi_0 + n\phi}}$. Thus, in this case we have 
+
+$$ \mu_A \mid \textbf{Y}_A, \sigma \sim N\bigg(\frac{\phi_A\gamma_A + (6/16)15.2}{\phi_A + (6/16)}, \sqrt{\frac{1}{\phi_A + (6/16)}}\,\bigg)$$
+
+and 
+
+$$ \mu_B \mid \textbf{Y}_B, \sigma \sim N\bigg(\frac{\phi_B\gamma_B + (6/16)6.2}{\phi_B + (6/16)}, \sqrt{\frac{1}{\phi_B + (6/16)}}\,\bigg) $$
+
+# Problem 5 
+
+a) As stated in the hint, I compute $\delta = \mu_A - \mu_B$ and check the proportion using $S=100000$ monte carlo draws. 
+
+```{r}
+S <- 10000
+n <- 6 
+phi <- 1/16
+phi_A <- (1/(20)^2)
+mu_A0 <- 0
+ybar_A <- 15.2
+phi_B <- (1/(20)^2)
+mu_B0 <- 0
+ybar_B <- 6.2 
+delta <- rnorm(S, mean = ((phi_A*mu_A0 + n*phi*ybar_A)/(phi_A + n*phi)), sd = sqrt(1/(phi_A + n*phi))) - rnorm(S, mean = ((phi_B*mu_B0 + n*phi*ybar_B)/(phi_B + n*phi)), sd = sqrt(1/(phi_B + n*phi))) 
+```
+
+```{r}
+ggplot(as.data.frame(delta), aes(x=delta)) + 
+  geom_histogram()
+```
+```{r}
+sum(delta > 0)/S
+```
+
+Thus, the average improvement for the accelerated group is larger than that for the no growth group since most of $\delta$ lies above 0 (using monte carlo simulation). 
+
+b) As suggested in the hint, I'll draw a posterior predictive distribution using the posteriors of $\mu_A$ and $\mu_B$ and their respective likelihoods. Then I'll find the proportion of positive draws from the $\widetilde{Y}_A - \widetilde{Y}_B$. 
+
+```{r}
+A_means <- numeric(length = S)
+B_means <- numeric(length = S)
+
+for(i in 1:S){
+  mu_A <- rnorm(1, mean = ((phi_A*mu_A0 + n*phi*ybar_A)/(phi_A + n*phi)), sd = sqrt(1/(phi_A + n*phi)))
+  mu_B <- rnorm(1, mean = ((phi_B*mu_B0 + n*phi*ybar_B)/(phi_B + n*phi)), sd = sqrt(1/(phi_B + n*phi)))
+  A_means[i] <- sum(rnorm(6, mean = mu_A, sd = 4))/6
+  B_means[i] <- sum(rnorm(6, mean = mu_B, sd = 4))/6
+}
+```
+
+```{r}
+differences <- A_means - B_means 
+mean(differences > 0)
+```
+
+Thus, most values of $\widetilde{Y}_A$ are higher than those in $\widetilde{Y}_B$ a child randomly assigned to the accelerated treatment will show better IQ improvement than a child randomly assigned to the normal treatment. 
