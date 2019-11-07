@@ -1,0 +1,140 @@
+---
+title: "Solutions to Homework 1"
+author: "Shashank Sule"
+date: "9/10/2019"
+header-includes:
+   - \usepackage{amsmath}
+   - \usepackage{amsthm}
+   - \usepackage{amssymb}
+   - \usepackage{amsfonts}
+output: pdf_document
+fontsize: 12pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Problem 1 
+
+Calculating the posterior distribution:
+
+```{r, echo = FALSE}
+pval <- seq(from = 0.3, to = 0.8, by=0.1)
+prior <- c(0.125, 0.125, 0.250, 0.250, 0.125, 0.125)
+n <- 30
+y <- 10
+posterior <- rep(0,length(pval))
+S <- sum(sapply(pval, dbinom, x = y, size = n)*prior)
+for(i in 1:length(pval)){
+  posterior[i] <- (dbinom(x=y,size=n,pval[i]))*prior[i]/S
+}
+vals <- data.frame(pval, prior, posterior)
+names(vals) <- c("p", "Prior", "Posterior")
+vals
+```
+
+a. Calculating the probability that 30% of the students prefer eating out on Friday:
+
+```{r, echo=FALSE}
+require(dplyr)
+filtered <- vals %>% filter(p==0.3)
+filtered$Posterior
+```
+
+b. The probability that more than half the students prefer eating out on a Friday: 
+
+```{r}
+filtered <- vals %>% filter(p>0.5)
+sum(filtered$Posterior)
+```
+
+c. The probability that between 20% and 40% of the students prefer eating out on a Friday: 
+```{r}
+filtered <- vals %>% filter(p>=0.2 & p<=0.4)
+sum(filtered$Posterior)
+```
+
+# Problem 2
+
+a. The owner thinks that every proportion is equally likely, i.e he can't really tell what the customers' preferences are. 
+
+b. The owner thinks that the customers don't like eating out on Fridays. 
+
+c. The owner thinks that about three-fourths of his customers like eating out on Fridays. 
+
+d. According to Beta(4,1), the owner thinks that his customers highly prefer eating out on Friday and that a higher proportion is always more likely than a lower proportion. On the other hand, according to Beta(4,2), the owner thinks that about three-fourths of his customers like eating out on Fridays, and that between any two proportions, the likelier one is the one that is closest to 0.75. 
+
+# Problem 3
+
+a) Density of Beta(0.5,0.5) at $p = \{0.1,0.5,0.9,1.5\}$
+
+```{r,echo=FALSE}
+p <- c(0.1,0.5,0.9,1.5)
+dens <- dbeta(p,0.5,0.5)
+data.frame(p,dens)
+```
+
+b) The probability $P(0.2 \le p \le 0.6)$ if $p \sim \textrm{Beta}(6, 3)$:
+
+```{r, echo=FALSE}
+pbeta(0.6,6,3) - pbeta(0.2,6,3)
+```
+
+(Hmm. The first 4 digits are the same as $pi$...)
+
+c) The quantile of the $\textrm{Beta}(10, 10)$ distribution at  the probability values  in the set $ \{0.1, 0.5, 0.9, 1.5\}$:
+
+```{r, echo=FALSE}
+quantiles <- qbeta(p,10,10)
+data.frame(p,quantiles)
+```
+
+d) A sample of 100 random values from $\textrm{Beta}(4, 2)$:
+
+```{r, echo=FALSE}
+vals <- rbeta(100,4,2)
+require(ggplot2)
+dataf <- data.frame(vals)
+ggplot(dataf, aes(x=vals))+
+  geom_histogram(binwidth = 0.05)+
+  xlab("p")
+```
+
+# Problem 4
+
+We know that if $Z \sim \text{Beta}(a,b)$ then $E[X] = \frac{a}{a+b}$. So suppose $X = (p \mid Y = y) \sim {\rm Beta}(a + y, b + n - y)$. Then 
+$$E[X] = \frac{a+y}{a+y+b+n-y} = \frac{a+y}{a+b+n}$$
+Now since $X$ is said to be a weighted average of the prior mean and the sample mean, suppose that $\exists \alpha \in (0,1)$ such that $E[X] = \alpha E[p] + (1-\alpha)\hat{p}$. We can expand the equation as follows: 
+
+$$ \frac{a+y}{a+b+n} = \alpha\frac{a}{a+b} + (1-\alpha)\frac{y}{n} = \alpha\Big(\frac{a}{a+b} - \frac{y}{n}\Big) + \frac{y}{n}$$
+Rearranging and then dividing by $\frac{a}{a+b} - \frac{y}{n}$ (when it is non-zero) on both sides we have that 
+
+$$ \alpha = \frac{\frac{a+y}{a+b+n} - \frac{y}{n}}{\frac{a}{a+b} - \frac{y}{n}}$$
+Expanding the fraction and then simplifying we have that 
+$$ = \frac{\frac{na + ny - ay - by -ny}{n(a + b + n)}}{\frac{na - ay - by}{n(a+b)}} = \frac{\frac{na - ay - by}{n(a + b + n)}}{\frac{na - ay - by}{n(a+b)}} = \frac{a+b}{a+b+n}$$
+
+Thus when $\frac{a}{a+b} \neq \frac{y}{n}$, $\alpha = \frac{a+b}{a+b+n}$. We can also show the sufficiency of $\alpha$ by reversing the argument. Thus, 
+
+$$ E[X] =  \frac{a+b}{a+b+n} E[p] + \frac{n}{a+b+n}\hat{p} = \frac{1}{1 + \frac{n}{a+b}} E[p] + \frac{\frac{n}{a+b}}{1+\frac{n}{a+b}}\hat{p}$$
+
+The posterior mean lies between the sample mean and the prior mean, thus integrating information from both model and experiment. Furthermore, the extent towards which it lies on either end depends how large $n$ is with respect to $a+b$. The beta distribution reflects the confidence that among $a+b$ trials, on average, $a$ will be successful. So when we conduct $n$ trials, the posterior average is given by how the number of trials compared with the prior number of trials, $a+b$. We believe that more trials provide us more information about the value of $p$ so if $n$ is much smaller than $a+b$ then the posterior mean should be weighted more towards the prior mean since it relied on a higher number of trials. On the other hand, if $n$ is much larger than $a+b$ then the posterior mean is weighted more towards the sample mean as a bigger sample reflects more information about the parameter. This can be seen from the fact that as $n \to \infty$, $\alpha \to 0$ so $1 - \alpha \to 1$ and so the weight on the sample mean approaches 1. Finally, in the case where $\frac{a}{a+b} = \frac{y}{n}$, we see that the sample mean IS the prior mean so the sampling gave us no new information! That is why we get $E[X] = \frac{y}{n} = E[p]$.
+
+# Problem 5
+
+Suppose the prior distribution $p \sim \text{Beta}(a,b)$. Then $\pi(p) = \frac{1}{B(a,b)}p^{a-1}(1-p)^{b-1}$ and likelihood $L(p) = {n \choose y} p^{y}(1-p)^{n-y}$. Then we can use Bayes' rule to get the posterior distribution $\pi(p\mid y)$:
+
+$$ \pi(p\mid y) = \frac{\pi(p)L(p)}{\int^{1}_{0}\pi(t)L(t)\,dt}$$ 
+$$ = \frac{\frac{1}{B(a,b)}p^{a-1}(1-p)^{b-1}{n \choose y} p^{y}(1-p)^{n-y}}{\int^{1}_{0}\frac{1}{B(a,b)}t^{a-1}(1-t)^{b-1}{n \choose y} t^{y}(1-t)^{n-y}\,dt}$$
+Cancelling the $B(a,b)$ and the ${n \choose y}$ terms and then collecting the powers in the integral and the numerator, we get 
+
+$$ \pi(p\mid y) = \frac{p^{a+y-1}(1-p)^{b+n-y-1}}{\int^{1}_{0}t^{a+y-1}(1-t)^{b+n-y-1}\,dt}$$
+
+Note that using the hint given during class, the integral at the bottom is just $B(a+y,b+n-y)$:
+
+$$ \pi(p\mid y) = \frac{1}{B(a+y,b+n-y)}p^{(a+y)-1}(1-p)^{(b+n-y)-1}$$
+This is the density function for $\text{Beta}(a+y, b+n-y)$. Since we can identify distributions with their density functions, we have that $p \mid Y = y \sim \text{Beta}(a+y, b+n-y)$
+
+
+
+

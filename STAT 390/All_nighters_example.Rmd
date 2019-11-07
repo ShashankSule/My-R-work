@@ -1,0 +1,143 @@
+---
+output:
+  pdf_document: default
+header-includes:
+  - \usepackage{color}
+  - \usepackage[dvipsnames]{xcolor}
+---
+----
+ Fall 2019: MATH 347 Bayesian Statistics
+---
+
+Here we calculate the posterior distribution given $n=20$ and $y=8$:
+
+```{r, results = 'asis'}
+require(knitr)
+#Entering data and the prior probabilities 
+priorvalues <- c(0, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1)
+priorprob <- c(1/23, 1/23, 7/23, 7/23, 3/23, 3/23, 1/23, 0/23, 0/23, 0/23, 0/23)
+
+n <- 20
+y <- 8
+
+#vector for storing results
+jointprob <- numeric(length = length(priorvalues))
+
+for(i in 1:length(priorvalues))
+{
+  
+  #compute Binomial probability given value of p - likelihood
+  binomprob <- dbinom(y, n, p = priorvalues[i])
+  
+  #compute joint probability - posterior
+  jointprob[i] <- binomprob * priorprob[i]
+  
+}
+
+#compute marginal probability of y 
+pofy <- sum(jointprob)
+
+#compute posterior probabilities
+posteriorprob <- jointprob/pofy
+
+#visualizing the posterior
+
+#put posterior probabilities in one matrix object for easy viewing 
+allnighterposterior <- as.data.frame(cbind(priorvalues, priorprob, posteriorprob))
+names(allnighterposterior) <- c("p", "prior", "posterior")
+
+#list the final posterior distribution, based on our prior derived in class
+allnighterposterior
+
+#plot the prior and posterior probabilities
+require(ggplot2)
+require(reshape2)
+
+allnighterposterior_all <- melt(allnighterposterior, id = "p")
+
+ggplot(allnighterposterior_all, aes(x = p, y = value, colour = variable)) +
+  geom_point(size = 3) + 
+  xlab("p") + ylab("probability") +
+ theme_bw(base_size = 12, base_family = "")
+kable(allnighterposterior, caption="Posterior using one-step updating")
+```
+
+In the following code, we assign the posterior calculated in class as prior and compute the posterior for $n=10$ and $y=5$.
+
+
+```{r}
+#Calculating posterior (n=10, y=3) from the prior distribution given in class
+require(knitr)
+priorvalues <- c(0, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1)
+priorprob <- c(1/23, 1/23, 7/23, 7/23, 3/23, 3/23, 1/23, 0/23, 0/23, 0/23, 0/23)
+
+n <- 10
+y <- 3
+
+#vector for storing results
+jointprob <- numeric(length = length(priorvalues))
+
+for(i in 1:length(priorvalues))
+{
+  
+  #compute Binomial probability given value of p - likelihood
+  binomprob <- dbinom(y, n, p = priorvalues[i])
+  
+  #compute joint probability - posterior
+  jointprob[i] <- binomprob * priorprob[i]
+  
+}
+
+#compute marginal probability of y 
+pofy <- sum(jointprob)
+
+#compute posterior probabilities
+posteriorprob <- jointprob/pofy
+
+
+#Now we will do a sequential update by settting the prior probabilities to the computed posterior probabilities and then setting n=10 and y=5
+
+priorprob <- posteriorprob
+n <- 10
+y <- 5
+
+
+jointprob <- numeric(length = length(priorvalues))
+
+for(i in 1:length(priorvalues))
+{
+  
+  #compute Binomial probability given value of p - likelihood
+  binomprob <- dbinom(y, n, p = priorvalues[i])
+  
+  #compute joint probability - posterior
+  jointprob[i] <- binomprob * priorprob[i]
+  
+}
+
+#compute marginal probability of y 
+pofy <- sum(jointprob)
+
+#compute posterior probabilities
+posteriorprob <- jointprob/pofy
+allnighterposterior <- as.data.frame(cbind(priorvalues, priorprob, posteriorprob))
+names(allnighterposterior) <- c("p", "prior", "posterior")
+
+#list the final posterior distribution, based on our prior derived in class
+allnighterposterior
+
+#plot the prior and posterior probabilities
+require(ggplot2)
+require(reshape2)
+
+allnighterposterior_all <- melt(allnighterposterior, id = "p")
+
+ggplot(allnighterposterior_all, aes(x = p, y = value, colour = variable)) +
+  geom_point(size = 3) + 
+  xlab("p") + ylab("probability") +
+ theme_bw(base_size = 12, base_family = "")
+
+kableallnighterposterior
+```
+
+Thus we see that the posterior with the bigger data set calculated in one update is the same as the posterior calculated by sequential updates of 10 at a time. This is because we assume that the trials are independent so the fact that out of 10 people 3 stayed up last year does not affect the fact that out of 10 other people, 5 stayed up last year. 
