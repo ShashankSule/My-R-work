@@ -1,0 +1,113 @@
+---
+title: "Case Study 3"
+authors: "Olivia Fiol and Shashank Sule"
+date: "04/12/2019"
+header-includes:
+   - \usepackage{amsmath}
+   - \usepackage{amsthm}
+   - \usepackage{amssymb}
+   - \usepackage{amsfonts}
+   - \usepackage[margin=1in]{geometry}
+output: pdf_document
+fontsize: 12pt
+---
+
+Our latent class model has the likelihood function
+\begin{align*}
+  Y_i=y_i|z_i,p_{z_i}\sim\text{Binomial}(m,p_{z_i}),
+\end{align*}
+with 
+\begin{align*}
+z_i|\pi\sim\text{Bernoulli}(\pi).
+\end{align*} The prior distributions are the following:
+\begin{align*}
+&p_1|z_i=1\sim\text{Uniform}(0.4,0.6),\\
+&p_0|z_i=0\sim\text{Uniform}(0.5,1), \text{ and}\\
+&\pi\sim\text{Beta}(a,b).
+\end{align*}
+
+
+# Simulation 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(ggplot2)
+require(gridExtra)
+require(ProbBayes)
+require(tidyverse)
+require(runjags)
+require(coda)
+require(devtools)
+crcblue <- "#2905a1"
+knitr::opts_chunk$set(echo = TRUE)
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+```
+
+```{r}
+library(readr)
+TrueFalseScores <- read_csv("TrueFalseScores.csv")
+View(TrueFalseScores)
+```
+
+
+
+```{r}
+modelString<-"
+model {
+## sampling
+for (i in 1:N){
+   theta[i] <- equals(z[i], 1) * p1 + equals(z[i], 0) * p0
+y[i] ~ dbin(theta[i], m)
+}
+for (i in 1:N){
+   z[i] ~ dbern(pi)
+}
+## priors
+p1 ~ dbeta(1,1)T(0.4,0.6)
+p0 ~ dbeta(1,1)T(0.5, 1)
+pi ~ dbeta(a,b)
+}
+"
+```
+
+```{r}
+y <- TrueFalseScores$Score
+N <- length(y)
+
+initsfunction <- function(chain){
+  .RNG.seed <- c(1,2)[chain]
+  .RNG.name <- c("base::Super-Duper",
+                 "base::Wichmann-Hill")[chain]
+  return(list(.RNG.seed=.RNG.seed,
+              .RNG.name=.RNG.name))
+}
+
+the_data <- list("y" = y, "N" = N, "m"=40, "a"=2, "b"=4)
+```
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+posterior <- run.jags(modelString,
+                      n.chains = 1,
+                      data = the_data,
+                      monitor = c("p1", "p0", "theta"),
+                      adapt = 1000,
+                      burnin = 5000,
+                      sample = 5000,
+                      thin = 10, 
+                      inits = initsfunction)
+```
+
+```{r}
+summary(posterior)
+```
+
+```{r, echo=FALSE}
+vars_list <- c("theta[1]", "theta[10]", "p0", "p1")
+plot(posterior, vars=vars_list)
+```
+
+The chain exhibits MCMC convergence; note that the `theta` values for the first five observations are approximately `0.43` and the values for the next 10 are approximately `0.83`. The data thus leads us to the conclusion that there was a guessing group. 

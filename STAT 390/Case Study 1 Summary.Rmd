@@ -1,0 +1,145 @@
+---
+title: "Case Study 1"
+author: "Sarah Boese and Shashank Sule"
+header-includes:
+   - \usepackage{amsmath}
+   - \usepackage{amsthm}
+   - \usepackage{amssymb}
+   - \usepackage{amsfonts}
+   - \usepackage[margin=1in]{geometry}
+output: pdf_document
+fontsize: 12pt
+date: "07/11/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Exploring the dataset
+
+```{r, echo=FALSE}
+install.packages("ggplot2")
+install.packages("dplyr")
+require(ggplot2)
+require(dplyr)
+library(readr)
+ItalyMarriageRates <- read_csv("ItalyMarriageRates.csv")
+View(ItalyMarriageRates)
+Dats <- ItalyMarriageRates %>% mutate(Period = if_else(Year < 1940, 1, if_else(Year > 1944, 3, 2)))
+ggplot(Dats, aes(x=Dats$Year,y=Dats$`Rates (per 1000)`, color=Dats$Period))+
+  geom_point()
+```
+
+It seems that marriage rates were lower per 1000 during the world war. We model them using a Hierarchical Poisson model (akin to what was seen in the midterm exam). Note that we regard the inter-war years as 1940-1944 instead of 1939-1945 because the second world war began and culminated in the middle of the two years 1939 and 1945 respectively (so there could have been a mixture of pre-war, inter-war, and post-war rates in '39 and '45). 
+
+# Model
+
+Let $Y_{i}$ be the marriage rate in year $i$ and $Y_{i} \sim \text{Poisson}(\lambda_i)$ where 
+
+$$ \lambda_i = \begin{cases}  \lambda_1 & 1936 \leq i \leq 1938 \\
+                              \lambda_2 & 1939 \leq i \leq 1945 \\
+                              \lambda_3 & 1946 \leq i \leq 1951 \end{cases}$$
+                              
+$$ \lambda_j \sim \text{Gamma}(a_j, b_j) \,, j:1 \leq j \leq 3$$
+
+We'll introduce a common normal hyperprior for $a_j$, $b_j$ each where the means reflect the shape and rate parameters deduced from the mean and variance from the data. 
+
+```{r}
+col <- Dats %>% select(`Rates (per 1000)`)
+mean(col$`Rates (per 1000)`)
+(sd(col$`Rates (per 1000)`))^2
+```
+
+So $a/b = 7.3125$ and $(a/b)*(1/b) = 7.3125*(1/b) = 1.9625$ so the value for $b$ is 
+
+```{r}
+7.3125/1.9625
+```
+
+and consequently $a$ is 
+
+```{r}
+3.726115*7.3125
+```
+
+Thus, $a_j \sim \text{N}(27.24722, 1)$ and $b_j \sim \text{N}(3.726115,1)$. 
+
+# Simulation 
+
+Data: 
+
+```{r}
+N <- length(ItalyMarriageRates$Year)
+Periods <- Dats$Period
+Y <- ItalyMarriageRates$`Rates (per 1000)`
+```
+
+Model: 
+
+```{r}
+
+modelString <-"
+model {
+## likelihood
+for (i in 1:N){
+y[i] ~ dpois(lambda[Periods[i]])
+}
+
+## priors
+for (j in 1:3){
+lambda[j] ~ dgamma(a,b)
+}
+
+## hyperpriors
+a ~ dnorm(A,100)
+b ~ dnorm(B,100)
+}
+"
+```
+
+Setting up JAGS: 
+
+```{r}
+the_data <- list("y" = Y, "N" = 16, "A" = 27.24722, "B" = 3.726115, "Periods" = Periods)
+
+initsfunction <- function(chain){
+  .RNG.seed <- c(1,2)[chain]
+  .RNG.name <- c("base::Super-Duper",
+                 "base::Wichmann-Hill")[chain]
+  return(list(.RNG.seed=.RNG.seed,
+              .RNG.name=.RNG.name))
+}
+```
+
+Running the simulation: 
+
+```{r}
+posterior <- run.jags(modelString,
+                      n.chains = 5,
+                      data = the_data,
+                      monitor = c("lambda", "a", "b"),
+                      adapt = 1000,
+                      burnin = 5000,
+                      sample = 5000,
+                      thin = 5)
+```
+
+Summary and Diagnostics: 
+
+```{r}
+summary(posterior)
+```
+
+```{r}
+plot(posterior, vars = "lambda[2]")
+plot(posterior, vars = "lambda[1]")
+plot(posterior, vars = "lambda[3]")
+```
+
+We ran 5 chains with a thinning value of 5 to ensure exploration of parameter space alongside low correlation. 
+
+# Commentary
+
+From the summary of posterior data in the poisson model, the mean inter-war rate was 1 point lower than the rates found post-war and pre-war. However, notice that the standard deviation for the post-war rate is almost 1, which means that when we actually sample from the posterior, 16% of the time the inter-war rate will be in the parameter space of the pre-war rate. Thus, we cannot satisfactorily claim that the inter-war rate was different from the post war one. 

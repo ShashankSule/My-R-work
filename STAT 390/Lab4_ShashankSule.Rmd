@@ -8,10 +8,6 @@ header-includes:
 ----
  Fall 2019: MATH 347 Bayesian Statistics
 ---
-
-```{r}
-
-```
 ## \textcolor{RoyalBlue}{{Lab 4: Hierarchical models for Kdrama rating}}
 #### Author: Shashank Sule
 
@@ -124,7 +120,97 @@ mu_j[j] ~ dnorm(mu, invtau2)T(0,)
 ```
 
 #### \textcolor{RoyalBlue}{Exercise 1:} Give appropriate truncated Normal prior distribution for $\mu_j$'s and truncated Normal hyperprior distribution for $\mu$. Run the new hierarchical model, and obtain the posterior summaries for all 7 parameters. Verify that the posterior draws of \texttt{mu} and \texttt{mu\_j[1]} through \texttt{mu\_j[4]} are all non-negative. Include the 2-by-2 traceplot + cdf + historgram + ACF plot for \texttt{mu\_j[1]} (Hint: use the \texttt{plot(posterior, vars = "mu\_j[1]"} command). Comment on the MCMC diagnostics for \texttt{mu\_j[1]}.
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+require(ggplot2)
+require(gridExtra)
+require(ProbBayes)
+require(tidyverse)
+require(runjags)
+require(coda)
+crcblue <- "#2905a1"
+knitr::opts_chunk$set(echo = TRUE)
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+```
 
+
+```{r}
+dramadata = read.csv("KDramaData.csv", header=T)
+
+KBSdrama = dramadata[dramadata$Producer==2,]
+KBSdrama$Schedule = as.factor(KBSdrama$Schedule)
+```
+
+```{r}
+modelString <-"
+model {
+## likelihood
+for (i in 1:N){
+y[i] ~ dnorm(mu_j[schedule[i]], invsigma2)
+}
+
+## priors
+for (j in 1:J){
+mu_j[j] ~ dnorm(mu, invtau2)T(0,)
+}
+invsigma2 ~ dgamma(a_g, b_g)
+sigma <- sqrt(pow(invsigma2, -1))
+
+## hyperpriors
+mu ~ dnorm(mu0, 1/g0^2)
+invtau2 ~ dgamma(a_t, b_t)
+tau <- sqrt(pow(invtau2, -1))
+}
+"
+```
+
+```{r}
+
+y = KBSdrama$Rating   
+schedule = KBSdrama$Schedule  
+N = length(y)  
+J = length(unique(schedule)) 
+
+initsfunction <- function(chain){
+  .RNG.seed <- c(1,2)[chain]
+  .RNG.name <- c("base::Super-Duper",
+                 "base::Wichmann-Hill")[chain]
+  return(list(.RNG.seed=.RNG.seed,
+              .RNG.name=.RNG.name))
+}
+
+the_data <- list("y" = y, "schedule" = schedule, "N" = N, "J" = J, 
+                 "mu0" = 0.1, "g0" = 0.5, 
+                 "a_t" = 1, "b_t" = 1,
+                 "a_g" = 1, "b_g" = 1)
+```
+
+```{r}
+posterior <- run.jags(modelString,
+                      n.chains = 1,
+                      data = the_data,
+                      monitor = c("mu", "tau", "mu_j", "sigma"),
+                      adapt = 1000,
+                      burnin = 5000,
+                      sample = 5000,
+                      thin = 1,
+                      inits = initsfunction)
+```
+
+```{r}
+summary(posterior)
+```
+Indeed, all the draws of $\mu_j$ are strictly non-negative (yet very close to zero).
+
+```{r}
+plot(posterior, vars = "mu_j[1]")
+```
+
+From the autocorrelation plot, it is clear that there was little correlation between the draws of $\mu_1$. However, it may seem from the CDF and trace plots that the draws weren't exploring the full parameter space. This is because they were being drawn from $N(\mu, \sigma)$ where $\mu$ was non-negative but that part of the distribution never got sampled due to truncation. 
 
 #### \textcolor{Bittersweet}{Grade for Exercise 1: /6} 
 #### \textcolor{Bittersweet}{Comments: }
@@ -170,39 +256,17 @@ mu_j[j] ~ dlnorm(mu, invtau2)
 
 #### \textcolor{RoyalBlue}{Exercise 2:} Give appropriate log-normal prior distribution for $\mu_j$'s and log-normal hyperprior distribution for $\mu$. Run the new hierarchical model, and obtain the posterior summaries for all 7 parameters. Verify that the posterior draws of \texttt{mu} and \texttt{mu\_j[1]} through \texttt{mu\_j[4]} are all non-negative. Include the 2-by-2 traceplot + cdf + historgram + ACF plot for \texttt{mu\_j[1]} (Hint: use the \texttt{plot(posterior, vars = "mu\_j[1]"} command). Comment on the MCMC diagnostics for \texttt{mu\_j[1]}. 
 
-```{r, eval=FALSE}
-install.packages("devtools")
-require(devtools)
-devtools::install_github("bayesball/ProbBayes")
-```
-
 ```{r}
-require(ggplot2)
-require(gridExtra)
-require(tidyverse)
-crcblue <- "#2905a1"
-```
-```{r}
-install.packages("runjags")
-library(runjags)
-```
-
-
-```{r}
-dramadata = read.csv("KDramaData.csv", header=T)
-
-KBSdrama = dramadata[dramadata$Producer==2,]
-KBSdrama$Schedule = as.factor(KBSdrama$Schedule)
 modelString <-"
 model {
 ## likelihood
-for (j in 1:J){
-mu_j[j] ~ dlnorm(mu, invtau2)
+for (i in 1:N){
+y[i] ~ dnorm(mu_j[schedule[i]], invsigma2)
 }
 
 ## priors
 for (j in 1:J){
-mu_j[j] ~ dnorm(mu, invtau2)
+mu_j[j] ~ dlnorm(mu, invtau2)
 }
 invsigma2 ~ dgamma(a_g, b_g)
 sigma <- sqrt(pow(invsigma2, -1))
@@ -213,7 +277,7 @@ invtau2 ~ dgamma(a_t, b_t)
 tau <- sqrt(pow(invtau2, -1))
 }
 "
-y = KBSdrama$Rating   
+y = KBSdrama$Rating  
 schedule = KBSdrama$Schedule  
 N = length(y)  
 J = length(unique(schedule)) 
@@ -242,17 +306,94 @@ posterior <- run.jags(modelString,
                       inits = initsfunction)
 ```
 
+```{r}
+summary(posterior)
+```
+
+Once again, the draws of $\mu_i$ are non-negative but they may not reflect the true range of ratings. The diagnostics for $\mu_1$: 
+
+```{r}
+plot(posterior, vars = "mu_j[1]")
+```
+The correlation for $\mu_1$ falls with lag so we must have sampled eventually with low correlation. However, the trace plot is a bit sticky so perhaps the parameter space is still unexplored. 
 
 #### \textcolor{Bittersweet}{Grade for Exercise 2: /6} 
 #### \textcolor{Bittersweet}{Comments: }
-
 
 ## \textcolor{RoyalBlue}{Your choice of distribution for the hyperprior for $\mu$ and priors for $\mu_j$'s}
 
 
 #### \textcolor{RoyalBlue}{Exercise 3:} Give appropriate prior distribution for $\mu_j$'s and hyperprior distribution for $\mu$ of your own choosing. Run the new hierarchical model, and obtain the posterior summaries for all 7 parameters. Verify that the posterior draws of \texttt{mu} and \texttt{mu\_j[1]} through \texttt{mu\_j[4]} are all non-negative. Include the 2-by-2 traceplot + cdf + historgram + ACF plot for \texttt{mu\_j[1]} (Hint: use the \texttt{plot(posterior, vars = "mu\_j[1]"} command). Comment on the MCMC diagnostics for \texttt{mu\_j[1]}. 
 
+Assuming that ratings are given between $0$ and $1$, I'll use a Beta prior where the shape parameters are both log-normally sampled and stick to the standard deviation model so 
 
+\begin{align*}
+Y_{ij} &\sim N(\mu_i, \sigma) \\
+\mu_i &\sim \text{Beta}(a,b) \\
+\log{a},\log{b} &\sim N(\mu_0, \sigma_0)  
+1/\sigma^2 \sim \\
+\end{align*}
+
+I use the values $\mu_0 = 0$, $\sigma_0 = 1$ and keep the previous values for the prior for $\sigma$. 
+
+```{r}
+modelString <-"
+model {
+## likelihood
+for (i in 1:N){
+y[i] ~ dnorm(mu_j[schedule[i]], invsigma2)
+}
+
+## priors
+for (j in 1:J){
+mu_j[j] ~ dbeta(a,b)
+}
+invsigma2 ~ dgamma(a_g, b_g)
+sigma <- sqrt(pow(invsigma2, -1))
+
+## hyperpriors
+a ~ dlnorm(mu0, 1/g0^2)
+b ~ dlnorm(mu0, 1/g0^2)
+
+}
+"
+y = KBSdrama$Rating  
+schedule = KBSdrama$Schedule  
+N = length(y)  
+J = length(unique(schedule)) 
+
+the_data <- list("y" = y, "schedule" = schedule, "N" = N, "J" = J, 
+                 "mu0" = 0, "g0" = 1, 
+                 "a_g" = 1, "b_g" = 1)
+
+initsfunction <- function(chain){
+  .RNG.seed <- c(1,2)[chain]
+  .RNG.name <- c("base::Super-Duper",
+                 "base::Wichmann-Hill")[chain]
+  return(list(.RNG.seed=.RNG.seed,
+              .RNG.name=.RNG.name))
+}
+
+posterior <- run.jags(modelString,
+                      n.chains = 1,
+                      data = the_data,
+                      monitor = c("mu", "mu_j", "sigma", "a", "b"),
+                      adapt = 1000,
+                      burnin = 5000,
+                      sample = 5000,
+                      thin = 1, 
+                      inits = initsfunction)
+```
+
+```{r}
+summary(posterior)
+```
+
+```{r}
+plot(posterior, vars = "mu_j[1]")
+```
+
+Using the beta prior, we see patterns similar to the log normal distribution except the traceplot reveals slightly lesser stickiness. However, the draws seem more correlated than the log-normal case. 
 #### \textcolor{Bittersweet}{Grade for Exercise 3: /6} 
 #### \textcolor{Bittersweet}{Comments: }
 

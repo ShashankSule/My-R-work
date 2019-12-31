@@ -1,0 +1,142 @@
+---
+title: "Case Study 2"
+author: "Caroline Beech and Shashank Sule"
+date: "25/11/2019"
+header-includes:
+   - \usepackage{amsmath}
+   - \usepackage{amsthm}
+   - \usepackage{amssymb}
+   - \usepackage{amsfonts}
+   - \usepackage[margin=1in]{geometry}
+output: pdf_document
+fontsize: 12pt
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, message = FALSE, warning=FALSE}
+require(ggplot2)
+require(gridExtra)
+require(ProbBayes)
+require(tidyverse)
+require(runjags)
+require(coda)
+require(devtools)
+require(runjags)
+require(dplyr)
+```
+
+# The Data
+
+We suspect the first 5 test-takers just guessed their questions. So let's label them according to our suspicion. 
+
+```{r, echo=FALSE, message = FALSE, warning=FALSE}
+library(readr)
+TrueFalseScores <- read_csv("TrueFalseScores.csv")
+#View(TrueFalseScores)
+```
+```{r, echo=FALSE, message=FALSE}
+TrueFalseScores <- TrueFalseScores %>% mutate(Suspect_Group = round(1/(1 + (5/Student)^2)) + 1) %>% mutate(Group = if_else(Suspect_Group == 1, "Guessers", "Non-Guessers"))
+ggplot(TrueFalseScores, aes(x=Student, y=Score, color = Group))+
+  geom_point()
+  
+```
+
+Hmm. Perhaps it is prudent to make two groups of students, suspected guessers and non-guessers with relatively sharp Beta priors and a binomial likelihood. Furthermore, the hyperpriors come from a poisson distribution (because $np$ represents the rate at which the questions are answered out of $n$ and it scales like a Poisson process). 
+
+# Model 
+
+From the previous section, we have the following model:
+
+\begin{align*}
+Y_{ij} &\sim Binom(40, p_j) \\
+p_1 &\sim \text{Beta}(n,n)\\
+n &\sim \text{Poisson}(20)\\
+p_2 &\sim \text{Beta}(m, 40-m)\\
+m &\sim \text{Poisson}(35)\\
+\end{align*}
+
+The expected priors: 
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(data = data.frame(p = c(0, 1)), aes(p)) + 
+  stat_function(fun = dbeta, args = list(shape1 = 20, shape2 = 20), aes(color = "Beta(20, 20) (prior 1)")) +
+  stat_function(fun = dbeta, args = list(shape1 = 35, shape2 = 5), aes(color = "Beta(35, 5) (prior 2)"))
+  ylab("Density")
+```
+
+Now our tests will lend credence to the belief of whether or not the first group was guessing. 
+
+# Simulation 
+
+```{r}
+modelString <-"
+model {
+## likelihood
+for (i in 1:N){
+y[i] ~ dbinom(p_j[x[i]], 40)
+}
+
+## priors
+p_j[1] ~ dbeta(n,n)
+p_j[2] ~ dbeta(m, 40-m)
+
+## hyperpriors
+n ~ dpois(n0)
+m ~ dpois(m0)
+}
+"
+```
+
+
+```{r}
+y <- TrueFalseScores$Score
+x <- TrueFalseScores$Suspect_Group
+J <- length(unique(x))
+N <- length(y)
+
+initsfunction <- function(chain){
+  .RNG.seed <- c(1,2)[chain]
+  .RNG.name <- c("base::Super-Duper",
+                 "base::Wichmann-Hill")[chain]
+  return(list(.RNG.seed=.RNG.seed,
+              .RNG.name=.RNG.name))
+}
+
+the_data <- list("y" = y, "x" = x, "N" = N, n0 = 20, m0 = 35)
+```
+
+```{r, message=FALSE, warning=FALSE}
+posterior <- run.jags(modelString,
+                      n.chains = 1,
+                      data = the_data,
+                      monitor = c("p_j", "n", "m"),
+                      adapt = 1000,
+                      burnin = 5000,
+                      sample = 5000,
+                      thin = 1, 
+                      inits = initsfunction)
+```
+
+```{r}
+summary(posterior)
+```
+
+All 4 parameters converge well in MCMC (the highest SSeff is 4493 and all the parameters have rapidly decaying autocorrelation):
+```{r, echo=FALSE}
+list_vars <- c("p_j[1]", "p_j[2]", "n", "m")
+plot(posterior, vars=list_vars)
+```
+
+# Summary 
+
+Gathering the data from the posterior, we get the following 90% posterior credible intervals for $p_1$ and $p_2$: 
+
+```{r, echo=FALSE}
+summary(posterior)[1:2, 1:3]
+```
+
+Thus, 90% of the time the first group behaves like it is almost guessing while the second group behaves like it has some knowledge of the problems. 
+

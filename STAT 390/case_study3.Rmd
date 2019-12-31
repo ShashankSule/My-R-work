@@ -1,0 +1,86 @@
+---
+title: "Case Study 3"
+output: html_document
+---
+
+# Simulation 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(ggplot2)
+require(gridExtra)
+require(ProbBayes)
+require(tidyverse)
+require(runjags)
+require(coda)
+require(devtools)
+crcblue <- "#2905a1"
+knitr::opts_chunk$set(echo = TRUE)
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+```
+
+```{r}
+library(readr)
+TrueFalseScores <- read_csv("TrueFalseScores.csv")
+View(TrueFalseScores)
+```
+
+
+
+```{r}
+modelString<-"
+model {
+## sampling
+for (i in 1:N){
+   theta[i] <- equals(z[i], 1) * p1 + equals(z[i], 0) * p0
+y[i] ~ dbin(theta[i], m)
+}
+for (i in 1:N){
+   z[i] ~ dbern(1/3)
+}
+## priors
+p1 <- 0.5
+p0 ~ dbeta(1,1) T(0.5, 1)
+}
+"
+```
+
+```{r}
+y <- TrueFalseScores$Score
+N <- length(y)
+
+initsfunction <- function(chain){
+  .RNG.seed <- c(1,2)[chain]
+  .RNG.name <- c("base::Super-Duper",
+                 "base::Wichmann-Hill")[chain]
+  return(list(.RNG.seed=.RNG.seed,
+              .RNG.name=.RNG.name))
+}
+
+the_data <- list("y" = y, "N" = N, m=40)
+```
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+posterior <- run.jags(modelString,
+                      n.chains = 1,
+                      data = the_data,
+                      monitor = c("z", "p1", "p0"),
+                      adapt = 1000,
+                      burnin = 5000,
+                      sample = 5000,
+                      thin = 1, 
+                      inits = initsfunction)
+```
+
+```{r}
+summary(posterior)
+```
+
+```{r, echo=FALSE}
+list_vars <- c("theta[1]", "theta[2]", "n", "m")
+plot(posterior, vars=list_vars)
+```

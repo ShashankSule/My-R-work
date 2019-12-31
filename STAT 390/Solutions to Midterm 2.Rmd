@@ -1,0 +1,339 @@
+---
+title: "Solutions to Midterm 2"
+author: "Shashank Sule"
+header-includes:
+   - \usepackage{amsmath}
+   - \usepackage{amsthm}
+   - \usepackage{amssymb}
+   - \usepackage{amsfonts}
+   - \usepackage[margin=1in]{geometry}
+output: pdf_document
+fontsize: 12pt
+date: "07/11/2019"
+---
+
+```{r, echo=FALSE}
+require(devtools)
+require(ggplot2)
+require(gridExtra)
+require(ProbBayes)
+require(tidyverse)
+crcblue <- "#2905a1"
+```
+```{r,echo=FALSE}
+require(runjags)
+require(coda)
+```
+
+
+# Problem 1 
+
+a) Let the $i$th rating for the $j$th movie be modelled by $Y_{ij} \sim N(\mu_j, \sigma)$ where $\mu_j$ is the movie-specific mean and $\sigma$ is the universal standard deviation. The standard deviation for $Y_{ij}$ basically captures how much a movie divides opinion. I believe that animation films divide opinion by roughly the same amount. If we had movies from different genres, say thriller or drama, then I would go for a genre-specific deviation. Furthermore, the standard deviation of the rating of each movie reveals the following: 
+
+```{r, echo=FALSE}
+library(readr)
+library(utils)
+X2010_animation_ratings <- read_csv("2010_animation_ratings.csv")
+#View(X2010_animation_ratings)
+```
+
+
+```{r, echo=FALSE}
+y  <- X2010_animation_ratings$rating
+groups <- X2010_animation_ratings$Group_Number
+N <- length(y)
+J = length(unique(groups))
+```
+
+```{r, echo=FALSE}
+MovieTitles <- X2010_animation_ratings %>% arrange(Group_Number) %>% select(title) %>% unique
+Deviations <- rep(0,J)
+names(Deviations) <- MovieTitles$title
+
+for(i in names(Deviations)){
+   rats <- X2010_animation_ratings %>% filter(title == i) %>% select(rating) 
+   Deviations[i] <- sd(rats$rating)
+}
+
+as.data.frame(Deviations)
+```
+
+Thus, the standard deviations seem to either be bunched up around 0.8 or 1.3. So although the more detailed choice is to assume that there are two deviation groups, I use them all under one deviation group to simplify the model. 
+
+The hierarchical model can then be set up as follows:
+
+\begin{align*}
+Y_{ij} &\sim N(\mu_j,\sigma_j) \\
+\mu_j &\sim N(\mu, \tau) \\
+1/\tau^2 &\sim \text{Gamma}(\alpha_{\tau}, \beta_{\tau})\\
+1/\sigma^{2}_{j} &\sim \text{Gamma}(\alpha_{\sigma}, \beta_{\sigma})
+\end{align*}
+
+Now I can run JAGS on this hierarchical model.
+
+```{r}
+modelString <-"
+model {
+## likelihood
+for (i in 1:N){
+y[i] ~ dnorm(mu_j[groups[i]], invsigma2)
+}
+
+## priors
+for (j in 1:J){
+mu_j[j] ~ dnorm(mu, invtau2)
+}
+invsigma2 ~ dgamma(a_g, b_g)
+sigma <- sqrt(pow(invsigma2, -1))
+
+## hyperpriors
+mu ~ dnorm(mu0, 1/g0^2)
+invtau2 ~ dgamma(a_t, b_t)
+tau <- sqrt(pow(invtau2, -1))
+}
+"
+```
+
+```{r}
+initsfunction <- function(chain){
+  .RNG.seed <- c(1,2)[chain]
+  .RNG.name <- c("base::Super-Duper",
+                 "base::Wichmann-Hill")[chain]
+  return(list(.RNG.seed=.RNG.seed,
+              .RNG.name=.RNG.name))
+}
+```
+
+```{r}
+the_data <- list("y" = y, "groups" = groups, "N" = N, "J" = J, 
+                 "mu0" = 5, "g0" = 0.25, 
+                 "a_t" = 1, "b_t" = 1,
+                 "a_g" = 1, "b_g" = 1)
+```
+
+```{r}
+posterior <- run.jags(modelString,
+                      n.chains = 1,
+                      data = the_data,
+                      monitor = c("mu", "tau", "mu_j", "sigma"),
+                      adapt = 1000,
+                      burnin = 5000,
+                      sample = 5000,
+                      thin = 1, 
+                      inits = initsfunction)
+```
+```{r}
+summary(posterior)
+```
+```{r}
+mu_string <- ""
+
+for(i in 1:J){
+   mu_string <- c(mu_string, paste("mu_j[",i,"]",sep=""))
+}
+
+mu_string <- mu_string[1:J+1]
+```
+
+b) I'll plot all of the variables, just to diagnose MCMC convergence 
+```{r}
+plot(posterior, vars = mu_string)
+```
+```{r}
+plot(posterior, vars = "sigma")
+```
+
+Mostly the samples seem to have converged, judging from trace and autocorrelation plots. Only $mu_2$ seems to have some amount of stickiness while $sigma$ has a little bit of correlation but neither are sizeable enough to necessitate higher samlpes, thinning, or burn-in. 
+
+c) Shrinkage/Pooling 
+
+Shrinkage: We compare the shrinkage effects in the mean ratings from the sample and those given by the posterior. 
+
+```{r}
+MovieTitles <- X2010_animation_ratings %>% arrange(Group_Number) %>% select(title) %>% unique
+```
+
+
+```{r}
+Ind_Stats = as.data.frame(matrix(NA, J, 2))
+names(Ind_Stats) = c("mean", "sd")
+for (j in 1:J){
+  Ind_Stats[j, ] = c(mean(X2010_animation_ratings$rating[X2010_animation_ratings$Group_Number==j]), sd(X2010_animation_ratings$rating[X2010_animation_ratings$Group_Number==j]))
+}
+
+Post_Means <- summary(posterior)[, 4]
+
+Means1 <- data.frame(Type = "Sample", Mean = Ind_Stats$mean)
+Means2 <- data.frame(Type = "Hierarchical", Mean =
+                       Post_Means[3:(4 + J - 2)])
+
+
+Means1$Title <- MovieTitles$title
+Means2$Title <- MovieTitles$title
+```
+
+```{r}
+ggplot(rbind(Means1, Means2), aes(Type, Mean, group=Title)) +
+  geom_line(color = crcblue) + geom_point() +
+  annotate(geom = "text", x = 0.75,
+           y = Means1$Mean + c(0.01, 0.01, 0.01, -0.01), 
+           size = 3, label = Means1$Title) + increasefont(Size = 10)
+```
+
+A large pooling effect is thus seen in the posterior means. This is also reflected through low variability. 
+
+Sources of variability: As with Normal hierarchical models, the in-group variability comes from $\sigma$ and the between-group variability comes from $\tau$. We look at the parameter $R = \frac{\tau^2}{\sigma^2 + \tau^2}$: 
+
+```{r message = FALSE, warning = FALSE}
+require(coda)
+tau_draws <- as.mcmc(posterior, vars = "tau")
+sigma_draws <- as.mcmc(posterior, vars = "sigma")
+R <- tau_draws^2/(tau_draws^2 + sigma_draws^2)
+
+df <- as.data.frame(R)
+
+quantile(R, c(0.025, 0.975))
+```
+
+
+```{r message = FALSE}
+ggplot(df, aes(x=R)) + geom_density() +
+  labs(title="Density of R") +
+  theme(plot.title = element_text(size=15)) +
+  theme(axis.title = element_text(size=15))
+```
+
+$R$ is closer to 0.5 so the inter-group variability is low. 
+
+# Problem 2 
+
+a)  Let $Y(x)$ denote the price of a house of size $x$. Then I use a linear regression model with a weakly informative prior:
+
+\begin{align*}
+Y(x) &\sim N(\beta_0 + \beta_1(x), \sigma)\\
+\beta_0 &\sim N(\mu_0, s_0) \\
+\beta_1 &\sim N(\mu_1, s_1) \\
+1/\sigma^2 \sim \text{Gamma}(a,b)
+\end{align*}
+
+
+
+b) Using JAGS: 
+
+```{r}
+library(readr)
+house_prices <- read_csv("house_prices.csv")
+#View(house_prices)
+y <- house_prices$price
+x <- house_prices$size
+N <-length(y)
+```
+```{r}
+ggplot(as.data.frame(x,y), aes(x=x, y=y))+
+   geom_point()
+```
+
+
+```{r}
+modelString <-"
+model {
+## sampling
+for (i in 1:N){
+y[i] ~ dnorm(beta0 + beta1*x[i], invsigma2)
+}
+
+## priors
+beta0 ~ dnorm(mu0, g0)
+beta1 ~ dnorm(mu1, g1)
+invsigma2 ~ dgamma(a, b)
+sigma <- sqrt(pow(invsigma2, -1))
+}
+"
+```
+
+
+```{r}
+the_data <- list("y" = y, "x" = x, "N" = N,
+                 "mu0" = 0, "g0" = 0.0001,
+                 "mu1" = 0, "g1" = 0.0001,
+                 "a" = 1, "b" = 1)
+
+initsfunction <- function(chain){
+  .RNG.seed <- c(1,2)[chain]
+  .RNG.name <- c("base::Super-Duper",
+                 "base::Wichmann-Hill")[chain]
+  return(list(.RNG.seed=.RNG.seed,
+              .RNG.name=.RNG.name))
+}
+```
+
+```{r}
+posterior <- run.jags(modelString,
+                      n.chains = 1,
+                      data = the_data,
+                      monitor = c("beta0", "beta1", "sigma"),
+                      adapt = 1000,
+                      burnin = 5000,
+                      sample = 10000,
+                      thin = 50,
+                      inits = initsfunction)
+```
+
+```{r}
+summary(posterior)
+```
+
+```{r}
+plot(posterior,  vars = "beta1")
+```
+
+Here I have plotted the MCMC diagnostics for the $\beta_1$,  i.e the slope parameter. MCMC convergence can be detected through the relatively spread-out trace plot and rapidly decaying autocorrelation (I used 10000 samplels with a thinning rate of 50). 
+
+c) The intercept $\beta_0$: The results for $\beta_0$ indicate that an apartment of size $0$ has , on average, a price of $-52.75$K USD and its price falls in $(-125.18\text{K}, 18.60\text{K})$ 90% of the time. 
+
+The slope $\beta_1$: When the size of a unit goes up by 1000 sq.ft, its price, on average, goes up by USD $0.12$K and 90% of the time the rise in price is between USD `0.0821146`K and `0.15854`K.
+
+d) 
+```{r message = FALSE, warning = FALSE, echo= FALSE}
+post <- as.mcmc(posterior)
+post_means <- apply(post, 2, mean)
+post <- as.data.frame(post)
+```
+
+Note that the expected price of an apartment is a good estimator of its predicted price and $E[Y(x)] = E[\beta_0] + xE[\beta_1]$. 
+
+```{r,echo=FALSE}
+beta_0 <- -52.7509355
+beta_1 <- 0.1210461
+
+Sizes <- c(1200, 1600, 2000, 2400)
+Exp_Prices <- beta_0 + beta_1*Sizes
+
+ans <- data.frame(Sizes, Exp_Prices)
+
+ans
+```
+
+Finally, the 90% credible intervals can be visualized and summarized as follows: 
+```{r message = FALSE, warning = FALSE, echo = FALSE}
+one_predicted <- function(x){
+  lp <- post[ , "beta0"] +  x * post[ , "beta1"]
+  y <- rnorm(5000, lp, post[, "sigma"])
+  data.frame(Size = paste("Size =", x),
+             Predicted_Price = y)
+}
+df <- map_df(c(1200, 1600, 2000, 2400), one_predicted)
+```
+
+```{r fig.align = "center", message = FALSE}
+require(ggridges)
+ggplot(df, aes(x = Predicted_Price, y = Size)) +
+  geom_density_ridges() +
+  theme_grey(base_size = 9, base_family = "")
+```
+
+```{r message = FALSE, warning = FALSE}
+df %>% group_by(Size) %>%
+  summarize(P05 = quantile(Predicted_Price, 0.05),
+            P95 = quantile(Predicted_Price, 0.95))
+```

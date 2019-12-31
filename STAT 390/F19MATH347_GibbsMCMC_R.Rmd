@@ -29,7 +29,7 @@ knitr::knit_hooks$set(chunk = function(x, options) {
 # Installing the necessary packages
 
 ```{r, eval = FALSE}
-install.packages("devtools")
+#install.packages("devtools")
 require(devtools)
 devtools::install_github("bayesball/ProbBayes")
 
@@ -45,11 +45,6 @@ crcblue <- "#2905a1"
 ## The TOTEXPPQ variable in the CE sample
 
 ```{r message = FALSE}
-require(ggplot2)
-require(gridExtra)
-require(ProbBayes)
-require(tidyverse)
-crcblue <- "#2905a1"
 CEsample <- read_csv("CEsample1.csv")
 
 summary(CEsample$TotalExpLastQ)
